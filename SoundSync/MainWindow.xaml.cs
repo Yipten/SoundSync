@@ -73,7 +73,7 @@ namespace SoundSync {
 		private DateTime GetDateTime() {
 			//get time and date from the Internet, which is the same place I found this code :)
 			try {
-				StreamReader stream = new StreamReader(WebRequest.Create("https://nist.time.gov/actualtime.cgi?lzbc=siqm9b").GetResponse().GetResponseStream());
+				StreamReader stream = new StreamReader(WebRequest.Create("https://nist.time.gov/actualtime.cgi").GetResponse().GetResponseStream());
 				string html = stream.ReadToEnd();
 				string time = Regex.Match(html, @"(?<=\btime="")[^""]*").Value;
 				double milliseconds = Convert.ToInt64(time) / 1000.0;
@@ -118,7 +118,7 @@ namespace SoundSync {
 			Minute.IsEnabled = false;
 			//get date and time from selected values
 			DateTime selectedDate = Date.SelectedDate.Value;
-			start = new DateTime(selectedDate.Year, selectedDate.Month, selectedDate.Day, (int)Hour.SelectedItem + (AM.IsChecked == true != ((int)Hour.SelectedItem == 12) ? 0 : 12), (int)Minute.SelectedItem, 0);
+			start = new DateTime(selectedDate.Year, selectedDate.Month, selectedDate.Day, (int)Hour.SelectedItem + (AM.IsChecked == true != ((int)Hour.SelectedItem == 12) ? 0 : 12), (int)Minute.SelectedItem, 0, 0);
 			//set timer interval as time until start time occurs
 			timer.Interval = start.Subtract(GetDateTime()).TotalMilliseconds;
 			timer.Start();
