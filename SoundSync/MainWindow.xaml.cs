@@ -10,9 +10,10 @@ using System.Windows.Media;
 
 namespace SoundSync {
 	public partial class MainWindow : Window {
-		private MediaPlayer music;
+		private readonly MediaPlayer music;
+		private readonly Timer timer;
+
 		private DateTime start;
-		private Timer timer;
 
 		private string fileName;
 
@@ -23,8 +24,9 @@ namespace SoundSync {
 
 			music = new MediaPlayer();
 			music.MediaEnded += Music_MediaEnded;
-			timer = new Timer();
-			timer.AutoReset = false;
+			timer = new Timer {
+				AutoReset = false
+			};
 			timer.Elapsed += Timer_Elapsed;
 			timer.Stop();
 
@@ -49,16 +51,6 @@ namespace SoundSync {
 			UpdateStatus("idle");
 		}
 
-		private void Timer_Elapsed(object sender, ElapsedEventArgs e) {
-			//stop the timer
-			timer.Stop();
-			//start the music!
-			Dispatcher.Invoke(() => {
-				music.Play();
-				UpdateStatus("playing \"" + fileName + "\"");
-			});
-		}
-
 		private void Music_MediaEnded(object sender, EventArgs e) {
 			//reset MediaPlayer and buttons after music ends
 			music.Stop();
@@ -71,6 +63,16 @@ namespace SoundSync {
 			AM.IsEnabled = true;
 			PM.IsEnabled = true;
 			UpdateStatus("\"" + fileName + "\" ended");
+		}
+
+		private void Timer_Elapsed(object sender, ElapsedEventArgs e) {
+			//stop the timer
+			timer.Stop();
+			//start the music!
+			Dispatcher.Invoke(() => {
+				music.Play();
+				UpdateStatus("playing \"" + fileName + "\"");
+			});
 		}
 
 		private DateTime GetDateTime() {
@@ -107,10 +109,8 @@ namespace SoundSync {
 			OpenFileDialog openFileDialog = new OpenFileDialog {
 				Filter = "Sound Files|*.wav; *.mp3|All Files|*.*"
 			};
-			//prompt user to open a sound file from their computer
-			bool? hasFile = openFileDialog.ShowDialog();
-			//if a file has been selected, load it into the MediaPlayer
-			if (hasFile == true) {
+			//if a file has been selected by the user, load it into the MediaPlayer
+			if (openFileDialog.ShowDialog() == true) {
 				music.Open(new Uri(openFileDialog.FileName, UriKind.Absolute));
 				WaitButton.IsEnabled = true;
 				fileName = openFileDialog.SafeFileName;
