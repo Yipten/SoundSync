@@ -1,5 +1,6 @@
 ﻿using Microsoft.Win32;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -67,21 +68,30 @@ namespace SoundSync {
 			Date.IsEnabled = true;
 			Hour.IsEnabled = true;
 			Minute.IsEnabled = true;
+			AM.IsEnabled = true;
+			PM.IsEnabled = true;
 			UpdateStatus("\"" + fileName + "\" ended");
 		}
 
 		private DateTime GetDateTime() {
+			//Stopwatch to account for delay in getting DateTime from the Internet
+			Stopwatch stopwatch = new Stopwatch();
+			stopwatch.Start();
+			//DateTime that will be returned
+			DateTime dateTime;
 			//get time and date from the Internet, which is the same place I found this code :)
 			try {
 				StreamReader stream = new StreamReader(WebRequest.Create("https://nist.time.gov/actualtime.cgi").GetResponse().GetResponseStream());
 				string html = stream.ReadToEnd();
 				string time = Regex.Match(html, @"(?<=\btime="")[^""]*").Value;
-				double milliseconds = Convert.ToInt64(time) / 1000.0;
-				return new DateTime(1970, 1, 1).AddMilliseconds(milliseconds).ToLocalTime();
+				double milliseconds = Convert.ToInt64(time) / 1000;
+				dateTime = new DateTime(1970, 1, 1).AddMilliseconds(milliseconds).ToLocalTime();
 			} catch {
 				MessageBox.Show("No Internet connection. Local time will be used. ", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-				return DateTime.Now;
+				dateTime = DateTime.Now;
 			}
+			stopwatch.Stop();
+			return dateTime.AddMilliseconds(stopwatch.ElapsedMilliseconds);
 
 			//this one works but sometimes doesn't
 			//return DateTime.ParseExact(WebRequest.Create("https://www.duckduckgo.com").GetResponse().Headers["date"], "ddd, dd MMM yyyy HH:mm:ss 'GMT'", CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.AssumeUniversal);
@@ -116,6 +126,8 @@ namespace SoundSync {
 			Date.IsEnabled = false;
 			Hour.IsEnabled = false;
 			Minute.IsEnabled = false;
+			AM.IsEnabled = false;
+			PM.IsEnabled = false;
 			//get date and time from selected values
 			DateTime selectedDate = Date.SelectedDate.Value;
 			start = new DateTime(selectedDate.Year, selectedDate.Month, selectedDate.Day, (int)Hour.SelectedItem + (AM.IsChecked == true != ((int)Hour.SelectedItem == 12) ? 0 : 12), (int)Minute.SelectedItem, 0, 0);
@@ -135,6 +147,8 @@ namespace SoundSync {
 			Date.IsEnabled = true;
 			Hour.IsEnabled = true;
 			Minute.IsEnabled = true;
+			AM.IsEnabled = true;
+			PM.IsEnabled = true;
 			UpdateStatus("loaded \"" + fileName + "\"");
 		}
 	}
