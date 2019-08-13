@@ -76,11 +76,11 @@ namespace SoundSync {
 		}
 
 		private DateTime GetDateTime() {
+			//DateTime that will be returned
+			DateTime dateTime;
 			//Stopwatch to account for delay in getting DateTime from the Internet
 			Stopwatch stopwatch = new Stopwatch();
 			stopwatch.Start();
-			//DateTime that will be returned
-			DateTime dateTime;
 			//get time and date from the Internet, which is the same place I found this code :)
 			try {
 				StreamReader stream = new StreamReader(WebRequest.Create("https://nist.time.gov/actualtime.cgi").GetResponse().GetResponseStream());
@@ -89,7 +89,7 @@ namespace SoundSync {
 				double milliseconds = Convert.ToInt64(time) / 1000;
 				dateTime = new DateTime(1970, 1, 1).AddMilliseconds(milliseconds).ToLocalTime();
 			} catch {
-				MessageBox.Show("No Internet connection. Local time will be used. ", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+				MessageBox.Show("No Internet connection. Local time will be used (not recommended).", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
 				dateTime = DateTime.Now;
 			}
 			stopwatch.Stop();
