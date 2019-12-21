@@ -1,8 +1,11 @@
-﻿using Microsoft.Win32;
+﻿using GuerrillaNtp;
+using Microsoft.Win32;
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Net;
+using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using System.Timers;
 using System.Windows;
@@ -24,9 +27,8 @@ namespace SoundSync {
 
 			music = new MediaPlayer();
 			music.MediaEnded += Music_MediaEnded;
-			timer = new Timer {
-				AutoReset = false
-			};
+			timer = new Timer();
+			timer.AutoReset = false;
 			timer.Elapsed += Timer_Elapsed;
 			timer.Stop();
 
@@ -76,27 +78,56 @@ namespace SoundSync {
 		}
 
 		private DateTime GetDateTime() {
+			//the method to the madness
+			int method = 1;
 			//DateTime that will be returned
-			DateTime dateTime;
+			DateTime dateTime = DateTime.Now;
 			//Stopwatch to account for delay in getting DateTime from the Internet
 			Stopwatch stopwatch = new Stopwatch();
-			stopwatch.Start();
-			//get time and date from the Internet, which is the same place I found this code :)
-			try {
-				StreamReader stream = new StreamReader(WebRequest.Create("https://nist.time.gov/actualtime.cgi").GetResponse().GetResponseStream());
-				string html = stream.ReadToEnd();
-				string time = Regex.Match(html, @"(?<=\btime="")[^""]*").Value;
-				double milliseconds = Convert.ToInt64(time) / 1000;
-				dateTime = new DateTime(1970, 1, 1).AddMilliseconds(milliseconds).ToLocalTime();
-			} catch {
-				MessageBox.Show("No Internet connection. Local time will be used (not recommended).", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-				dateTime = DateTime.Now;
+			switch (method) {
+				case 0:
+					//get time and date from time.gov
+					try {
+						StreamReader stream = new StreamReader(WebRequest.Create("https://nist.time.gov/actualtime.cgi?lzbc=siqm9b").GetResponse().GetResponseStream());
+						string html = stream.ReadToEnd();
+						string time = Regex.Match(html, @"(?<=\btime="")[^""]*").Value;
+						double milliseconds = Convert.ToInt64(time) / 1000;
+						dateTime = new DateTime(1970, 1, 1).AddMilliseconds(milliseconds).ToLocalTime();
+					} catch {
+						MessageBox.Show("No Internet connection. Local time will be used (not recommended).", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+					}
+					break;
+				case 1:
+					//get time from website header
+					try {
+						dateTime = DateTime.ParseExact(WebRequest.Create("https://www.duckduckgo.com").GetResponse().Headers["date"], "ddd, dd MMM yyyy HH:mm:ss 'GMT'", CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.AssumeUniversal);
+					} catch {
+						MessageBox.Show("No Internet connection. Local time will be used (not recommended).", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+					}
+					break;
+				case 2:         //TODO: figure out why it sometimes throws NtpException
+								//get time from Network Time Protocol (currently most reliable)
+					try {
+						NtpClient ntp = new NtpClient(Dns.GetHostAddresses("pool.ntp.org")[0]) {
+							Timeout = new TimeSpan(0, 0, 10)
+						};
+						NtpPacket packet = ntp.Query();
+						stopwatch.Start();
+						ntp.Dispose();
+						TimeSpan offset = packet.CorrectionOffset + packet.RoundTripTime;
+						dateTime = DateTime.Now + offset;
+					} catch (NtpException) {
+						MessageBox.Show("An error occurred while fetching the NTP packet.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+					} catch (SocketException) {
+						MessageBox.Show("SocketException - timeout exceeded.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+					}
+					//} catch {
+					//	MessageBox.Show("No Internet connection. Local time will be used (not recommended).", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+					//}
+					break;
 			}
 			stopwatch.Stop();
 			return dateTime.AddMilliseconds(stopwatch.ElapsedMilliseconds);
-
-			//this one works but sometimes doesn't
-			//return DateTime.ParseExact(WebRequest.Create("https://www.duckduckgo.com").GetResponse().Headers["date"], "ddd, dd MMM yyyy HH:mm:ss 'GMT'", CultureInfo.InvariantCulture.DateTimeFormat, DateTimeStyles.AssumeUniversal);
 		}
 
 		private void UpdateStatus(string text) {
@@ -120,21 +151,25 @@ namespace SoundSync {
 		}
 
 		private void WaitButton_Click(object sender, RoutedEventArgs e) {
-			LoadButton.IsEnabled = false;
-			StopButton.IsEnabled = true;
-			WaitButton.IsEnabled = false;
-			Date.IsEnabled = false;
-			Hour.IsEnabled = false;
-			Minute.IsEnabled = false;
-			AM.IsEnabled = false;
-			PM.IsEnabled = false;
 			//get date and time from selected values
 			DateTime selectedDate = Date.SelectedDate.Value;
 			start = new DateTime(selectedDate.Year, selectedDate.Month, selectedDate.Day, (int)Hour.SelectedItem + (AM.IsChecked == true != ((int)Hour.SelectedItem == 12) ? 0 : 12), (int)Minute.SelectedItem, 0, 0);
-			//set timer interval as time until start time occurs
-			timer.Interval = start.Subtract(GetDateTime()).TotalMilliseconds;
-			timer.Start();
-			UpdateStatus("starting at " + start.ToShortTimeString() + " on " + start.ToShortDateString());
+			if (start.CompareTo(GetDateTime()) > 0) {
+				LoadButton.IsEnabled = false;
+				StopButton.IsEnabled = true;
+				WaitButton.IsEnabled = false;
+				Date.IsEnabled = false;
+				Hour.IsEnabled = false;
+				Minute.IsEnabled = false;
+				AM.IsEnabled = false;
+				PM.IsEnabled = false;
+				//set timer interval as time until start time occurs
+				timer.Interval = start.Subtract(GetDateTime()).TotalMilliseconds;
+				timer.Start();
+				UpdateStatus("starting at " + start.ToShortTimeString() + " on " + start.ToShortDateString());
+			} else {
+				MessageBox.Show("Cannot set to a time in the past.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+			}
 		}
 
 		private void StopButton_Click(object sender, RoutedEventArgs e) {
